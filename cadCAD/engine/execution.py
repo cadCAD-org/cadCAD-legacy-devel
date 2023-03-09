@@ -1,4 +1,5 @@
 from pathos.multiprocessing import ProcessPool
+from joblib import Parallel, delayed
 from collections import Counter
 
 from cadCAD.utils import flatten

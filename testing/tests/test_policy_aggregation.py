@@ -16,7 +16,7 @@ print(tabulate(result_diff, headers='keys', tablefmt='psql'))
 
 
 class PolicyAggTest(compare_results(result_diff)):
-    pass
+    def test_import(self):
 
 
 if __name__ == '__main__':
