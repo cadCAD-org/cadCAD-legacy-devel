@@ -1,28 +1,33 @@
 from pathos.multiprocessing import ProcessPool
 from joblib import Parallel, delayed
-from collections import Counter
-
+from collections import Counter, deque
 from cadCAD.utils import flatten
 
 VarDictType = dict[str, list[object]]
 StatesListsType = list[dict[str, object]]
-ConfigsType = list[tuple[list[callable], list[callable]]]
-EnvProcessesType = dict[str, callable]
 
+
+PolicyBlock = tuple[callable]
+VariableBlock = tuple[callable]
+SubstepBlock = tuple[VariableBlock, PolicyBlock]
+StateUpdateBlock = tuple[SubstepBlock]
+ConfigBlocks = list[StateUpdateBlock] # dim: [Config, Substep, Variable | Policy, Function Order]
+EnvProcessesType = dict[str, callable]
+ConfigParams = list[object]
 
 def single_proc_exec(
     simulation_execs: list[callable],
     var_dict_list: list[VarDictType],
     states_lists: list[StatesListsType],
-    configs_structs: list[ConfigsType],
+    configs_structs: ConfigBlocks,
     env_processes_list: list[EnvProcessesType],
     Ts: list[range],
-    SimIDs,
+    SimIDs: list[int],
     Ns: list[int],
     ExpIDs: list[int],
-    SubsetIDs,
-    SubsetWindows,
-    configured_n
+    SubsetIDs: list[int],
+    SubsetWindows: list[list[int | None]],
+    configured_n: int
 ):
     print(f'Execution Mode: single_threaded')
     params = [
@@ -42,19 +47,20 @@ def parallelize_simulations(
     simulation_execs: list[callable],
     var_dict_list: list[VarDictType],
     states_lists: list[StatesListsType],
-    configs_structs: list[ConfigsType],
+    configs_structs: ConfigBlocks,
     env_processes_list: list[EnvProcessesType],
     Ts: list[range],
-    SimIDs,
+    SimIDs: list[int],
     Ns: list[int],
     ExpIDs: list[int],
     SubsetIDs: list[int],
-    SubsetWindows,
-    configured_n
+    SubsetWindows: list[list[int | None]],
+    configured_n: int
 ):
 
     print(f'Execution Mode: parallelized')
-    params = list(
+    # `params` dim: [Config, Variable]
+    params: list[ConfigParams] = list(
         zip(
             simulation_execs, var_dict_list, states_lists, configs_structs, env_processes_list,
             Ts, SimIDs, Ns, SubsetIDs, SubsetWindows
@@ -62,12 +68,15 @@ def parallelize_simulations(
     )
 
     len_configs_structs = len(configs_structs)
-
-    unique_runs = Counter(SimIDs)
-    sim_count = max(unique_runs.values())
+    sim_count = len(SimIDs)
     highest_divisor = int(len_configs_structs / sim_count)
 
-    new_configs_structs, new_params = [], []
+    new_configs_structs: list[ConfigBlocks] = []
+    new_params: list[list[ConfigParams]] = []
+
+    """
+    Split `params` and `config_structs` 
+    """
     for count in range(len(params)):
         if count == 0:
             new_params.append(
@@ -104,7 +113,7 @@ def local_simulations(
         simulation_execs: list[callable],
         var_dict_list: list[VarDictType],
         states_lists: list[StatesListsType],
-        configs_structs: list[ConfigsType],
+        configs_structs: ConfigBlocks,
         env_processes_list: list[EnvProcessesType],
         Ts: list[range],
         SimIDs,
